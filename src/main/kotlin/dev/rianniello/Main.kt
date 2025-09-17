@@ -1,5 +1,6 @@
 package dev.rianniello
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
@@ -19,6 +20,7 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import java.net.URLEncoder
 
 fun main() {
     embeddedServer(Netty, port = 8080) { module() }.start(wait = true)
@@ -47,6 +49,24 @@ fun Application.module() {
     val publicJwkSet = JWKSet(rsaJwk.toPublicJWK())
 
     routing {
+        get("/offer") {
+            val offer = mapOf(
+                "credential_offer" to mapOf(
+                    "credential_issuer" to "http://localhost:8080",
+                    "grants" to mapOf(
+                        "urn:ietf:params:oauth:grant-type:pre-authorized_code" to mapOf(
+                            "pre-authorized_code" to "PREAUTH-123"
+                        )
+                    )
+                )
+            )
+            val offerUri = "openid-credential-offer://" + URLEncoder.encode(jacksonObjectMapper().writeValueAsString(offer), "UTF-8")
+            call.respondText(
+                "<html><body><h3>Scan to get a credential</h3><pre>$offerUri</pre></body></html>",
+                ContentType.Text.Html
+            )
+        }
+
         // --- 1) Issuer metadata (OID4VCI) ---
         get("/.well-known/openid-credential-issuer") {
             // Minimal example; extend as needed
@@ -64,6 +84,7 @@ fun Application.module() {
             )
             call.respond(metadata)
         }
+
 
         // --- 2) JWKS (public keys) ---
         get("/.well-known/jwks.json") {
